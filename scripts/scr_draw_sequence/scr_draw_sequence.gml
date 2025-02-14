@@ -8,7 +8,24 @@
 
 global._sequence_cache = {};
 
-function draw_sequence(_seqid,_frame=0,_x=0,_y=0, _xsc=1,_ysc=1, _ang=0, _col=c_white,_alph=1) {	
+function draw_sequence(_seqid,_frame=undefined,_x=undefined,_y=undefined, _xsc=undefined,_ysc=undefined, _ang=undefined, _col=undefined,_alph=undefined) {	
+	_draw_sequence_helper(_seqid,_frame,_x,_y,_xsc,_ysc,_ang,_col,_alph);
+}
+/*
+edit struct example
+(for changing how specific sprites behave)
+{
+	"sp_player_hat": {
+		drawfunc: function(sprite,index,x,y,xscale,yscale,angle,color,alpha),
+		(optional) visiblefunc: bool function
+	}
+}
+*/
+function draw_sequence_edited(_seqid,_frame=undefined,_x=undefined,_y=undefined, _xsc=undefined,_ysc=undefined, _ang=undefined, _col=undefined,_alph=undefined, _edit_struct=undefined) {
+	_draw_sequence_helper(_seqid,_frame,_x,_y,_xsc,_ysc,_ang,_col,_alph,_edit_struct);
+}
+
+function _draw_sequence_helper(_seqid,_frame=0,_x=0,_y=0, _xsc=1,_ysc=1, _ang=0, _col=c_white,_alph=1, _edit_struct=undefined) {
 	
 	sequence_cache(_seqid);
 	var seq_cache = global._sequence_cache[$ _seqid];
@@ -28,12 +45,31 @@ function draw_sequence(_seqid,_frame=0,_x=0,_y=0, _xsc=1,_ysc=1, _ang=0, _col=c_
 	
 	_frame = floor(_frame % seq_cache.frame_count);
 	
+	var is_edited = is_struct(_edit_struct);
+	
 	//draw cached sprites for this frame
 	var parts = seq_cache.frames[_frame]
 	var partlen = array_length(parts);
-	var part,part_ang;
+	var part,part_ang,part_sprite,drawfunc,sprite_key,edits;
 	for(var p=0; p<partlen; p++) {
 		part = parts[p];
+		part_sprite = part.sprite;
+		
+		
+		drawfunc = draw_sprite_ext;
+		
+		if is_edited {
+			sprite_key = part.key;
+			if variable_struct_exists(_edit_struct,sprite_key) {
+				edits = _edit_struct[$ sprite_key];
+				//check visible
+				if variable_struct_exists(edits,"visiblefunc") && !edits.visiblefunc() {
+					continue;
+				}
+				drawfunc = edits.drawfunc;
+			}
+		}
+		
 		
 		part_ang = part.angle;
 		
@@ -46,8 +82,8 @@ function draw_sequence(_seqid,_frame=0,_x=0,_y=0, _xsc=1,_ysc=1, _ang=0, _col=c_
 		}
 		
 		
-		draw_sprite_ext(
-			part.sprite,
+		drawfunc(
+			part_sprite,
 			part.index,
 			_x + part.x * _xsc,
 			_y + part.y * _ysc,
@@ -66,7 +102,6 @@ function draw_sequence(_seqid,_frame=0,_x=0,_y=0, _xsc=1,_ysc=1, _ang=0, _col=c_
 	}
 	
 }
-
 
 
 function sequence_cache(_seqid) {
@@ -125,6 +160,7 @@ function sequence_cache(_seqid) {
 			for(var frame_index=sprite_startframe; frame_index<=sprite_endframe; frame_index++) {
 				
 				var frame_str = {
+					key: sprite_get_name(sprite),
 					sprite,
 					index: (frame_index * sprite_speed/60),
 					x: sprite_x,

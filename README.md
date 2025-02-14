@@ -1,7 +1,7 @@
 # draw_sequence
 Manually draw a sequence in GameMaker
 
-![demo_image](https://github.com/user-attachments/assets/0c8d7008-f2ba-43f5-816f-46991a2664b5)
+![screenshot](https://github.com/user-attachments/assets/e01390da-f612-436e-ac23-c2a36664c06c)
 
 
 
@@ -23,3 +23,15 @@ Missing features:
 - sprite index, sprite speed not implemented. It will just play the sprite's animation. (for now)
 - there is no interpolation. My code is for using a sequence just like a frame based animation.
 
+
+`draw_sequence_edited()`:
+
+you can pass in a struct to change how specific sprites are drawn.
+```gml
+{
+	"sp_player_hat": {
+		drawfunc: function(sprite,index,x,y,xscale,yscale,angle,color,alpha),
+		(optional) visiblefunc: function() -> bool
+	}
+}
+```

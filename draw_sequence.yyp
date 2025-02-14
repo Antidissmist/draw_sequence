@@ -30,6 +30,7 @@
     {"id":{"name":"seq_example","path":"sequences/seq_example/seq_example.yy",},},
     {"id":{"name":"sp_border","path":"sprites/sp_border/sp_border.yy",},},
     {"id":{"name":"sp_box","path":"sprites/sp_box/sp_box.yy",},},
+    {"id":{"name":"sp_smiley_2","path":"sprites/sp_smiley_2/sp_smiley_2.yy",},},
     {"id":{"name":"sp_smiley","path":"sprites/sp_smiley/sp_smiley.yy",},},
   ],
   "resourceType":"GMProject",
