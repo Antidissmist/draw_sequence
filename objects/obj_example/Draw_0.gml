@@ -9,6 +9,10 @@ var ang = current_time/20;
 draw_sequence(seq_asset,frame,hspacing*3,vspacing, xsc,ysc,ang);
 
 
+draw_text(200,vspacing+100,"regular sequence");
+draw_text(200+hspacing,vspacing+100,"draw_sequence");
+draw_text(200+hspacing*2,vspacing+100,"draw_sequence\nwith angle & scale");
+
 
 frame += 1/60 * 10;
 
