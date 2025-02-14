@@ -19,7 +19,7 @@ Features:
 
 Missing features:
 - not tested with sequence tracks other than sprites.
-- sprite origin is not implemented
+- parameter tracks for "origin" and others are not implemented. Only position, rotation, scale.
 - sprite index, sprite speed not implemented. It will just play the sprite's animation. (for now)
 - there is no interpolation. My code is for using a sequence just like a frame based animation.
 
