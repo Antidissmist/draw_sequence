@@ -1,5 +1,5 @@
 /*
-*	draw_sequence | v1.0.0
+*	draw_sequence | v1.0.1
 *	Github: https://github.com/Antidissmist/draw_sequence
 *	Author: Antidissmist
 */
@@ -14,10 +14,11 @@ function draw_sequence(_seqid,_frame=undefined,_x=undefined,_y=undefined, _xsc=u
 /*
 edit struct example
 (for changing how specific sprites behave)
+(the trackname argument is to differentiate multiple tracks of the same sprite)
 {
 	"sp_player_hat": {
-		drawfunc: function(sprite,index,x,y,xscale,yscale,angle,color,alpha),
-		(optional) visiblefunc: bool function
+		drawfunc: function(sprite,index,x,y,xscale,yscale,angle,color,alpha, trackname),
+		(optional) visiblefunc: function(trackname) -> bool
 	}
 }
 */
@@ -43,6 +44,10 @@ function _draw_sequence_helper(_seqid,_frame=0,_x=0,_y=0, _xsc=1,_ysc=1, _ang=0,
 		_ang = 0;
 	}
 	
+	if _frame == -1 {
+		//default speed
+		_frame = current_time/1000 * seq_cache.playback_speed;
+	}
 	_frame = floor(_frame % seq_cache.frame_count);
 	
 	var is_edited = is_struct(_edit_struct);
@@ -55,15 +60,14 @@ function _draw_sequence_helper(_seqid,_frame=0,_x=0,_y=0, _xsc=1,_ysc=1, _ang=0,
 		part = parts[p];
 		part_sprite = part.sprite;
 		
-		
-		drawfunc = draw_sprite_ext;
+		drawfunc = undefined;
 		
 		if is_edited {
 			sprite_key = part.key;
 			if variable_struct_exists(_edit_struct,sprite_key) {
 				edits = _edit_struct[$ sprite_key];
 				//check visible
-				if variable_struct_exists(edits,"visiblefunc") && !edits.visiblefunc() {
+				if variable_struct_exists(edits,"visiblefunc") && !edits.visiblefunc(part.trackname) {
 					continue;
 				}
 				drawfunc = edits.drawfunc;
@@ -82,17 +86,33 @@ function _draw_sequence_helper(_seqid,_frame=0,_x=0,_y=0, _xsc=1,_ysc=1, _ang=0,
 		}
 		
 		
-		drawfunc(
-			part_sprite,
-			part.index,
-			_x + part.x * _xsc,
-			_y + part.y * _ysc,
-			part.xscale * _xsc,
-			part.yscale * _ysc,
-			part_ang,
-			_col,
-			_alph
-		);
+		if drawfunc != undefined {
+			drawfunc(
+				part_sprite,
+				part.index,
+				_x + part.x * _xsc,
+				_y + part.y * _ysc,
+				part.xscale * _xsc,
+				part.yscale * _ysc,
+				part_ang,
+				_col,
+				_alph,
+				part.trackname
+			);
+		}
+		else {
+			draw_sprite_ext(
+				part_sprite,
+				part.index,
+				_x + part.x * _xsc,
+				_y + part.y * _ysc,
+				part.xscale * _xsc,
+				part.yscale * _ysc,
+				part_ang,
+				_col,
+				_alph
+			);
+		}
 		
 	}
 	
@@ -115,10 +135,17 @@ function sequence_cache(_seqid) {
 			show_debug_message("draw_sequence unknown sequence!");
 			return;
 		}
+		
+		var _fps = 60; //of the game
 		var frame_count = struct.length;
+		var playback_speed = struct.playbackSpeed;
+		if struct.playbackSpeedType==spritespeed_framespergameframe {
+			playback_speed *= _fps;
+		}
 		
 		var seq_cache = {
 			frame_count,
+			playback_speed,
 			frames: array_create(frame_count,undefined),
 		};
 		cache[$ _seqid] = seq_cache;
@@ -134,6 +161,8 @@ function sequence_cache(_seqid) {
 			if track.type != seqtracktype_graphic continue;
 			if !track.enabled || !track.visible continue;
 			
+			var trackname = track.name; //by default the sprite name
+			
 			//get sprite
 			var sprite = track.keyframes[0].channels[0].spriteIndex;
 			if !sprite_exists(sprite) {
@@ -145,11 +174,19 @@ function sequence_cache(_seqid) {
 			var sprite_endframe = min( sprite_startframe + sprite_frame_length, frame_count-1 );
 			
 			var sprite_speed = sprite_get_speed(sprite);
+			if sprite_get_speed_type(sprite)==spritespeed_framespergameframe {
+				sprite_speed *= _fps; //speed will match that in the editor, but it seems that the actual in-room sequence speed is incorrect :P
+			}
 			
-			var transforms = track.tracks; //position, rotation, scale, origin
+			var transforms = track.tracks; //position, rotation, scale, origin, image_index
 			var transforms_count = array_length(transforms);
 			
-			//default transforms
+			//image speed is disabled when there exists an image_index track
+			var has_index_track = array_any(transforms,function(elem,ind){
+				return elem.name=="image_index";
+			});
+			
+			//default properties
 			var sprite_x = 0;
 			var sprite_y = 0;
 			var sprite_xscale = 1;
@@ -161,32 +198,37 @@ function sequence_cache(_seqid) {
 				
 				var frame_str = {
 					key: sprite_get_name(sprite),
+					trackname,
 					sprite,
-					index: (frame_index * sprite_speed/60),
+					index: has_index_track ? 0 : (frame_index * sprite_speed/playback_speed),
 					x: sprite_x,
 					y: sprite_y,
 					xscale: sprite_xscale,
 					yscale: sprite_yscale,
 					angle: sprite_angle,
 				};
+				var sprite_frame_count = sprite_get_number(sprite);
 				if !is_array(seq_cache.frames[frame_index]) {
 					seq_cache.frames[frame_index] = [];
 				}
 				array_push(seq_cache.frames[frame_index],frame_str);
 				
 				
-				//for each transform (position, rotation, scale, origin)
+				//for each transform (position, rotation, scale, origin, image_index)
 				//iterate backwards to avoid the duplicate scale track :P
 				for(var r=transforms_count-1; r>=0; r--) {
 					var transform = transforms[r];
 					
 					var transform_frames = transform.keyframes;
 					var transform_frame_count = array_length(transform_frames);
+					if transform_frame_count==0 continue; //no keyframes, skip
 					
 					//find last frame of this transform
 					var transform_index = 0;
+					var last_frame = 0;
 					for(var tf=0; tf<transform_frame_count; tf++) {
-						if transform_frames[tf].frame <= frame_index {
+						last_frame = transform_frames[tf].frame;
+						if last_frame <= frame_index {
 							transform_index = tf;
 						}
 						else {
@@ -214,8 +256,13 @@ function sequence_cache(_seqid) {
 						
 						//"origin"
 						
+						case "image_index":
+							var last_ind = transform_frame.channels[0].value;
+							frame_str.index = clamp(last_ind,0,sprite_frame_count-1); //sequences clamp the frame
+						break;
+						
 					}
-										
+					
 				}
 				
 				

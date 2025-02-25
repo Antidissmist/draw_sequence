@@ -18,7 +18,7 @@ draw_text(200+hspacing*2,vspacing+100,"draw_sequence\nwith angle & scale");
 draw_text(200+hspacing,vspacing*2.5+100,"draw_sequence_edited");
 
 
-frame += 1/60 * 10;
+frame += 1/60 * sequence_speed;
 
 //loop
 if layer_sequence_get_headpos(layseq) >= layer_sequence_get_length(layseq)-1 {
