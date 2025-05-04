@@ -28,8 +28,7 @@ function draw_sequence_edited(_seqid,_frame=undefined,_x=undefined,_y=undefined,
 
 function _draw_sequence_helper(_seqid,_frame=0,_x=0,_y=0, _xsc=1,_ysc=1, _ang=0, _col=c_white,_alph=1, _edit_struct=undefined) {
 	
-	sequence_cache(_seqid);
-	var seq_cache = global._sequence_cache[$ _seqid];
+	var seq_cache = sequence_cache(_seqid);
 	
 	
 	//use a matrix if the transforms aren't simple
@@ -272,7 +271,7 @@ function sequence_cache(_seqid) {
 		
 	}
 	
-	
+	return cache[$ _seqid];
 }
 
 
