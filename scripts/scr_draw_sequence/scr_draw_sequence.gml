@@ -1,10 +1,23 @@
 /*
-*	draw_sequence | v1.0.1
+*	draw_sequence | v1.0.2
 *	Github: https://github.com/Antidissmist/draw_sequence
 *	Author: Antidissmist
 */
 
 
+enum _seqprop {
+	key,
+	trackname,
+	sprite,
+	index,
+	xpos,
+	ypos,
+	xscale,
+	yscale,
+	angle,
+	
+	SIZE
+}
 
 global._sequence_cache = {};
 
@@ -34,7 +47,9 @@ function _draw_sequence_helper(_seqid,_frame=0,_x=0,_y=0, _xsc=1,_ysc=1, _ang=0,
 	//use a matrix if the transforms aren't simple
 	var do_matrix = sign(_xsc)!=_xsc || sign(_ysc)!=_ysc || _ang!=0;
 	if do_matrix {
-		matrix_stack_push(matrix_build(_x,_y,0, 0,0,_ang, _xsc,_ysc, 1));
+		static _cachemat = matrix_build_identity();
+		matrix_build(_x,_y,0, 0,0,_ang, _xsc,_ysc,1, _cachemat)
+		matrix_stack_push(_cachemat);
 		matrix_set(matrix_world,matrix_stack_top());
 		_x = 0;
 		_y = 0;
@@ -53,20 +68,18 @@ function _draw_sequence_helper(_seqid,_frame=0,_x=0,_y=0, _xsc=1,_ysc=1, _ang=0,
 	
 	//draw cached sprites for this frame
 	var parts = seq_cache.frames[_frame]
-	var partlen = array_length(parts);
-	var part,part_ang,part_sprite,drawfunc,sprite_key,edits;
-	for(var p=0; p<partlen; p++) {
-		part = parts[p];
-		part_sprite = part.sprite;
+	var part,part_ang,drawfunc,edits;
+	var partindex = 0;
+	repeat(array_length(parts)) {
+		part = parts[partindex++];
 		
 		drawfunc = undefined;
 		
 		if is_edited {
-			sprite_key = part.key;
-			if variable_struct_exists(_edit_struct,sprite_key) {
-				edits = _edit_struct[$ sprite_key];
+			edits = struct_get_from_hash(_edit_struct,part[_seqprop.key]);
+			if !is_undefined(edits) {
 				//check visible
-				if variable_struct_exists(edits,"visiblefunc") && !edits.visiblefunc(part.trackname) {
+				if struct_exists(edits,"visiblefunc") && !edits.visiblefunc(part[_seqprop.trackname]) {
 					continue;
 				}
 				drawfunc = edits.drawfunc;
@@ -74,7 +87,7 @@ function _draw_sequence_helper(_seqid,_frame=0,_x=0,_y=0, _xsc=1,_ysc=1, _ang=0,
 		}
 		
 		
-		part_ang = part.angle;
+		part_ang = part[_seqprop.angle];
 		
 		//flip angle
 		if _xsc < 0 {
@@ -87,26 +100,26 @@ function _draw_sequence_helper(_seqid,_frame=0,_x=0,_y=0, _xsc=1,_ysc=1, _ang=0,
 		
 		if drawfunc != undefined {
 			drawfunc(
-				part_sprite,
-				part.index,
-				_x + part.x * _xsc,
-				_y + part.y * _ysc,
-				part.xscale * _xsc,
-				part.yscale * _ysc,
+				part[_seqprop.sprite],
+				part[_seqprop.index],
+				_x + part[_seqprop.xpos] * _xsc,
+				_y + part[_seqprop.ypos] * _ysc,
+				part[_seqprop.xscale] * _xsc,
+				part[_seqprop.yscale] * _ysc,
 				part_ang,
 				_col,
 				_alph,
-				part.trackname
+				part[_seqprop.trackname]
 			);
 		}
 		else {
 			draw_sprite_ext(
-				part_sprite,
-				part.index,
-				_x + part.x * _xsc,
-				_y + part.y * _ysc,
-				part.xscale * _xsc,
-				part.yscale * _ysc,
+				part[_seqprop.sprite],
+				part[_seqprop.index],
+				_x + part[_seqprop.xpos] * _xsc,
+				_y + part[_seqprop.ypos] * _ysc,
+				part[_seqprop.xscale] * _xsc,
+				part[_seqprop.yscale] * _ysc,
 				part_ang,
 				_col,
 				_alph
@@ -195,22 +208,28 @@ function sequence_cache(_seqid) {
 			//for each frame in the sequence, add a cached part
 			for(var frame_index=sprite_startframe; frame_index<=sprite_endframe; frame_index++) {
 				
-				var frame_str = {
-					key: sprite_get_name(sprite),
+				var frame_obj = [
+					//key
+					variable_get_hash(sprite_get_name(sprite)),
+					//trackname
 					trackname,
+					//sprite, index
 					sprite,
-					index: has_index_track ? 0 : (frame_index * sprite_speed/playback_speed),
-					x: sprite_x,
-					y: sprite_y,
-					xscale: sprite_xscale,
-					yscale: sprite_yscale,
-					angle: sprite_angle,
-				};
+					has_index_track ? 0 : (frame_index * sprite_speed/playback_speed),
+					//xpos,ypos
+					sprite_x,
+					sprite_y,
+					//xscale,yscale
+					sprite_xscale,
+					sprite_yscale,
+					//angle
+					sprite_angle
+				];
 				var sprite_frame_count = sprite_get_number(sprite);
 				if !is_array(seq_cache.frames[frame_index]) {
 					seq_cache.frames[frame_index] = [];
 				}
-				array_push(seq_cache.frames[frame_index],frame_str);
+				array_push(seq_cache.frames[frame_index],frame_obj);
 				
 				
 				//for each transform (position, rotation, scale, origin, image_index)
@@ -240,24 +259,24 @@ function sequence_cache(_seqid) {
 					switch (transform.name) {
 						
 						case "position":
-							frame_str.x = transform_frame.channels[1].value; //why reversed? idk???
-							frame_str.y = transform_frame.channels[0].value;
+							frame_obj[_seqprop.xpos] = transform_frame.channels[0].value;
+							frame_obj[_seqprop.ypos] = transform_frame.channels[1].value;
 						break;
 						
 						case "rotation":
-							frame_str.angle = transform_frame.channels[0].value;
+							frame_obj[_seqprop.angle] = transform_frame.channels[0].value;
 						break;
 						
 						case "scale":
-							frame_str.xscale = transform_frame.channels[1].value;
-							frame_str.yscale = transform_frame.channels[0].value;
+							frame_obj[_seqprop.xscale] = transform_frame.channels[0].value;
+							frame_obj[_seqprop.yscale] = transform_frame.channels[1].value;
 						break;
 						
 						//"origin"
 						
 						case "image_index":
 							var last_ind = transform_frame.channels[0].value;
-							frame_str.index = clamp(last_ind,0,sprite_frame_count-1); //sequences clamp the frame
+							frame_obj[_seqprop.index] = clamp(last_ind,0,sprite_frame_count-1); //sequences clamp the frame
 						break;
 						
 					}
