@@ -1,4 +1,4 @@
-# draw_sequence 1.0.1
+# draw_sequence 1.0.2
 Manually draw a sequence in GameMaker
 
 ![screenshot](https://github.com/user-attachments/assets/e01390da-f612-436e-ac23-c2a36664c06c)
